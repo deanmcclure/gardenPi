@@ -8,6 +8,7 @@ from garduinoLib import *
 ser = serial.Serial(
     port='/dev/ttyUSB0',
     #port='COM4',
+    timeout=5,
     baudrate=57600,
     parity=serial.PARITY_NONE,
     stopbits=serial.STOPBITS_ONE,
@@ -34,19 +35,14 @@ tomcloseRes = Sensor('print a4read()\r',arduino,sensorPower)
 capsicumPump = Pump('p1on()\r','p1off()\r',arduino)
 tomfarPump = Pump('p2on()\r','p2off()\r',arduino)
 tomclosePump = Pump('p3on()\r','p3off()\r',arduino)
-
 #plants
-try:
-    capsicum = PlantMon('capsicum',capsicumPump,arduino,soil=capsicumSoil,reservoir=capsicumRes)
-    capsicum.start()
-    tomfar = PlantMon('Tomato Far',tomfarPump,arduino,reservoir=tomfarRes)
-    tomfar.start()
-    tomclose = PlantMon('Tomato Close',tomclosePump,arduino,reservoir=tomcloseRes)
-    tomclose.start()
-except:
-    print "failed initialisation"
-    shutdown()
+capsicum = PlantMon('Capsicum',capsicumPump,arduino,soil=capsicumSoil,reservoir=capsicumRes)
+tomfar = PlantMon('Tomato Far',tomfarPump,arduino,reservoir=tomfarRes)
+tomclose = PlantMon('Tomato Close',tomclosePump,arduino,reservoir=tomcloseRes)
+
 
 while(True):
-    time.sleep(1)
+    print 'looping'
+    waterAll()
+    time.sleep(10)
 
