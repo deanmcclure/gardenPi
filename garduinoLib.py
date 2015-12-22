@@ -2,13 +2,12 @@ import traceback
 import serial
 import datetime
 import time
-import signal
 import logging
-from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
-import threading
 import csv
 import sys
 import os
+import RPi.GPIO as GPIO
+
 
 logLocation = '/home/pi/garden/log/garden.log'
 dataLocation = '/home/pi/garden/data/'
@@ -53,6 +52,21 @@ class Log(object):
         csvFile.close()
         return True
 
+class localSensor(object):
+    def __init__(self,sensorGPIO,powerGPIO):
+        self.sensorGPIO = sensorGPIO
+        self.powerGPIO = powerGPIO
+        GPIO.setmode(GPIO.BOARD)
+        GPIO.setup(self.powerGPIO, GPIO.OUT)
+        GPIO.setup(self.sensorGPIO, GPIO.IN)
+        self.sense = self.read()
+    def read(self):
+        GPIO.output(self.powerGPIO, True)
+        time.sleep(0.5)
+        self.sense = GPIO.input(self.sensorGPIO)
+        GPIO.output(self.powerGPIO, False)
+        return self.sense
+        
 class PlantMon(object):
     _registry = []
     def __init__(self,name,pump,bitlasharduino,soil=None,reservoir=None):
@@ -191,21 +205,6 @@ class BitlashArduino(object):
         self.serial.readline()
         return self.serial.readline()
 
-def sigint_handler(signum,frame):
-    shutdown()
-
-def shutdown():
-    print 'shutting down web server'
-    server.socket.close()
-    print 'shutting down all pumps'
-    for pump in Pump._registry:
-        pump.off()
-    for plant in PlantMon._registry:
-        print 'shutting down {plant} pump'.format(plant = plant.name)
-        logging.info('shutting down {plant} pump'.format(plant = plant.name))
-        plant.pump.off()
-    exit()
-
 def waterAll():
     print 'checking all plants'
     for plant in PlantMon._registry:
@@ -213,34 +212,3 @@ def waterAll():
         logging.info('checking {plant}'.format(plant = plant.name))
         plant.water()
 
-class MyHandler(BaseHTTPRequestHandler):
-
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-type',    'text/html')
-        self.end_headers()
-        for plant in PlantMon._registry:
-            self.wfile.write('<b>{plant}</b><br>'.format(plant = plant.name))
-            if plant.fault:
-                self.wfile.write('WATERING SYSTEM FAULTED<br>')
-            else:
-                self.wfile.write('Watering System Operational<br>')
-            if plant.soil:
-                self.wfile.write('Soil is currently at {adc} dryness (water at {dry})<br>'.format(adc = plant.soil.adc, dry =
-                soildryADC))
-            if plant.reservoir:
-                self.wfile.write('Reservoir is currently at {adc} dryness (water at {dry})<br>'.format(adc = plant.reservoir.adc,
-                dry = reservoirdryADC))
-            if plant.lastWatered:
-                self.wfile.write('Last watered {time}<br>'.format(time = plant.lastWatered.strftime("%Y/%m/%d %H:%M:%S")))
-                self.wfile.write('Watered {count} time(s) since {time}<br>'.format(count = plant.wateredCount, time =
-                inittime.strftime("%Y/%m/%d %H:%M:%S")))
-            else:
-                self.wfile.write('Not watered since {time}<br>'.format(time = inittime.strftime("%Y/%m/%d %H:%M:%S")))
-            self.wfile.write('<br><br>')
-
-#setup webserver
-server = HTTPServer(('0.0.0.0', 80), MyHandler)
-signal.signal(signal.SIGINT, sigint_handler)
-webserverThread = threading.Thread(target=server.serve_forever)
-webserverThread.start()
