@@ -6,18 +6,52 @@ import signal
 import logging
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 import threading
+import csv
+import sys
+import os
+
+logLocation = '/home/pi/garden/log/garden.log'
+dataLocation = '/home/pi/garden/data/'
 
 logging.basicConfig(level=logging.INFO, 
-                    filename='/home/pi/garden/log/garden.log', # log to this file
+                    filename=logLocation, # log to this file
                     format='%(asctime)s %(message)s'
                     ) # include timestamp
 
 #constants
-soildryADC = 400
+soildryADC = 385
 reservoirdryADC = 750
 pumptimemax = datetime.timedelta(seconds = 30)
 pumptimemin = 10
 inittime = datetime.datetime.now()
+
+class Log(object):
+    def __init__(self,name):
+        self.name = name
+        self.filepath = str(dataLocation) + str(self.name) + '.csv'
+        self.log = []
+        self.readLogFile()
+    def getLog(self):
+        return self.log
+    def readLogFile(self):
+        if os.path.isfile(self.filepath):
+            csvFile = open(self.filepath, 'rt')
+            reader = csv.reader(csvFile)
+            self.log = list(reader)
+            csvFile.close()
+            return True
+        else:
+            self.log = []
+            return False
+    def addLog(self,data):
+        if not os.path.exists(dataLocation):
+            os.makedirs(dataLocation)
+        row = [str(i) for i in data]
+        csvFile = open(self.filepath, 'a')
+        writer = csv.writer(csvFile)
+        writer.writerow(row)
+        csvFile.close()
+        return True
 
 class PlantMon(object):
     _registry = []
@@ -31,6 +65,9 @@ class PlantMon(object):
         self.lastWatered = None
         self.wateredCount = 0
         self.fault = 0
+        self.waterLog = Log(self.name+'_water')
+        self.soilLog = Log(self.name+'_soil')
+        self.reservoirLog = Log(self.name+'_reservoir')
 
     def doesplantneedwater(self):
         logging.info('checking {name} water levels'.format(name=self.name))
@@ -47,6 +84,7 @@ class PlantMon(object):
                 soildry = 1
             logging.info("soil ADC: {adc}".format(adc = self.soil.adc))
             logging.info("soil Setpoint: {adc}".format(adc = soildryADC))
+            self.soilLog.addLog([datetime.datetime.now(), self.soil.adc])
         if self.reservoir is None:
             reservoirdry = 1
         else:
@@ -56,6 +94,7 @@ class PlantMon(object):
                 reservoirdry = 1
             logging.info("reservoir ADC: {adc}".format(adc = self.reservoir.adc))
             logging.info("reservoir Setpoint: {adc}".format(adc = reservoirdryADC))
+            self.reservoirLog.addLog([datetime.datetime.now(), self.reservoir.adc])
         if soildry == 1 and reservoirdry == 1:
             logging.info("plant is dry")
             return 1
@@ -85,6 +124,7 @@ class PlantMon(object):
                     self.fault = 1
                     print "pump fault"
                     logging.critical("{name} pump fault".format(name=self.name))
+                self.waterLog.addLog([pumpstart,(datetime.datetime.now() - pumpstart)])
         else:
             if self.pump.state == 1:
                 self.pump.off()
@@ -133,7 +173,8 @@ class Sensor(object):
     def readADC(self):
         self.power.on()
         time.sleep(0.5)
-        self.adc = int(self.arduino.read(self.cmd_read))
+        l = [int(self.arduino.read(self.cmd_read)) for _ in range(20)]
+        self.adc = reduce(lambda x, y: x + y, l) / len(l)
         self.power.off()
         return self.adc
 

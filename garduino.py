@@ -44,5 +44,5 @@ tomclose = PlantMon('Tomato Close',tomclosePump,arduino,reservoir=tomcloseRes)
 while(True):
     print 'looping'
     waterAll()
-    time.sleep(10)
+    time.sleep(300)
 
