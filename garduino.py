@@ -53,7 +53,7 @@ class MyHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type',    'text/html')
         self.end_headers()
-        self.wfile.write('Hydropronic Reservoir Dry?: {dry}<br>'.format(dry = 'Yes' if hydroRes.sense else 'No'))
+        self.wfile.write('Hydropronic Reservoir Dry?: {dry}<br>'.format(dry = 'Yes' if hydroRes.read() else 'No'))
         self.wfile.write('<br><br>')
         for plant in PlantMon._registry:
             self.wfile.write('<b>{plant}</b><br>'.format(plant = plant.name))

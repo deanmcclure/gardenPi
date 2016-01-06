@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO,
                     ) # include timestamp
 
 #constants
-soildryADC = 385
+soildryADC = 360
 reservoirdryADC = 750
 pumptimemax = datetime.timedelta(seconds = 30)
 pumptimemin = 10
@@ -62,8 +62,9 @@ class localSensor(object):
         self.sense = self.read()
     def read(self):
         GPIO.output(self.powerGPIO, True)
-        time.sleep(0.5)
-        self.sense = GPIO.input(self.sensorGPIO)
+        time.sleep(0.1)
+        l = [int(GPIO.input(self.sensorGPIO)) for _ in range(20)]
+        self.sense = reduce(lambda x, y: x + y, l) / len(l)
         GPIO.output(self.powerGPIO, False)
         return self.sense
         
@@ -195,14 +196,24 @@ class Sensor(object):
 class BitlashArduino(object):
     def __init__(self, tty):
         self.serial = tty
-        self.serial.readline()
+        self.serial.flushInput()
+        self.serial.flushOutput()
+        #self.serial.readline()
     def write(self, cmd):
+        self.serial.flushInput()
+        self.serial.flushOutput()
         self.serial.write(cmd)
+        time.sleep(0.1)
         self.serial.readline()
+        time.sleep(0.1)
         return self.serial.readline()
     def read(self, cmd):
+        self.serial.flushInput()
+        self.serial.flushOutput()
         self.serial.write(cmd)
+        time.sleep(0.1)
         self.serial.readline()
+        time.sleep(0.1)
         return self.serial.readline()
 
 def waterAll():
